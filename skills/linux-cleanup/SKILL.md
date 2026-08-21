@@ -1,6 +1,6 @@
 ---
 name: linux-cleanup
-description: Audit and safely reclaim disk space on Linux with native package-manager, journal, Flatpak, Docker, and Podman tools. Use when a Linux filesystem is full or the user asks to inspect disk usage, clean caches or logs, remove unused packages or runtimes, or prune container data. Keep broad requests non-mutating until the user selects an exact cleanup operation.
+description: Audit and safely reclaim disk space on Linux with native filesystem, package-manager, log, Flatpak, Snap, Docker, and Podman tools. Use when a Linux filesystem is full or the user asks to inspect disk usage, clean caches or logs, remove unused packages or runtimes, or prune container data. Keep broad requests non-mutating until the user selects an exact cleanup operation.
 license: MIT
 ---
 
@@ -37,16 +37,19 @@ Complete this step only when the target filesystem and every inspected context a
 The examples assume GNU/Linux; confirm options against the installed implementation and use consistent explicit units when comparing measurements.
 
 - Measure the target with `df -hT` and `df -i` using a path on that filesystem.
+- On Btrfs, add `btrfs filesystem usage MOUNT` and, when useful, `btrfs filesystem du PATH`; report privilege-limited detail and distinguish estimated free space, `statfs`/`df`, and shared/exclusive usage. Inventory subvolumes/snapshots with the installed manager. Never treat generic `du` or a snapshot's logical size as physical reclaimable space.
 - Rank large directories with `du` on the canonical target. Exclude every nested or unrelated mount found above. Treat `-x`/`--one-file-system` only as a same-device guard: it does not block same-filesystem bind mounts.
 - If inodes are scarce, rank inode-heavy directories with `du --inodes --one-file-system` or an installed equivalent, applying the same recorded mount exclusions; `--one-file-system` still does not exclude same-filesystem bind mounts.
 - Inspect only relevant installed subsystems:
   - journal: inventory every in-scope `--system`, explicitly selected `--user`, or directory context separately with `journalctl --disk-usage`; never treat one or an access-limited view as the total
+  - traditional logs: when `logrotate` is relevant, map log files to their effective configuration and preview it with `logrotate --debug CONFIG`; keep this separate from journald and report unreadable configuration/state
   - Docker: after resolving the effective local daemon, use `docker system df -v`; add `docker buildx du` for the selected builder when BuildKit/buildx is relevant
   - Podman: after resolving the effective local connection/store, use `podman system df -v` and state that its documented view does not inventory every build-cache or external-storage candidate
   - Flatpak: inventory each selected installation separately; there is no transaction-equivalent dry run for `uninstall --unused`
+  - Snap: when installed or in scope, inventory retained revisions with `snap list --all` and data snapshots with `snap saved` separately; report access gaps
   - package managers: measure caches and preview orphan candidates with the matching native tool where that preview is non-mutating
 - If visible `du` usage is materially below `df`, or space remains allocated after cleanup, inspect deleted-but-open files with an installed read-only diagnostic such as `lsof` or readable `/proc/*/fd`. Report permission/namespace gaps; never manipulate `/proc` entries or restart a service without separate approval.
-- Treat every reclaimable size as an estimate. Shared layers, hard links, copy-on-write, compression, active journal files, and deleted-but-open files make totals non-additive. Never present a combined total unless the scopes and methods are demonstrably disjoint and additive.
+- Treat every reclaimable size as an estimate. Shared layers, hard links, reflinks, snapshots, copy-on-write, compression, active journal files, and deleted-but-open files make totals non-additive. Never present a combined total unless the scopes and methods are demonstrably disjoint and additive.
 
 Complete this step with a before snapshot, coverage gaps, and candidates from authoritative subsystem inventories.
 
@@ -70,18 +73,21 @@ Confirm every command and option against the installed version's `--help` or man
 
 | Subsystem | Non-mutating preflight | One operation after approval |
 | --- | --- | --- |
-| APT | measure the archive cache; `apt-get -s autoremove` for package candidates, treating simulation as an estimate | `apt-get clean` for cached packages; `apt-get autoremove` is a separate operation |
+| APT | measure the archive cache; `apt-get -s autoremove` for package candidates, treating simulation as an estimate | `apt-get autoclean` for no-longer-downloadable cache artifacts; `apt-get clean` is a separate all-cache operation and `apt-get autoremove` a separate package operation |
 | DNF 4 | `dnf -C list --autoremove` with cached metadata | `dnf clean packages`; `dnf autoremove` is a separate operation |
 | DNF 5 | `dnf5 -C info --autoremove` prevents downloads but a non-root run may create `~/.cache/libdnf5`; omit it unless that cache write was explicitly accepted | `dnf5 clean packages`; `dnf5 autoremove` is a separate operation |
-| pacman | `paccache -d` using the configured cache | `paccache -r` keeps its documented default of three versions; it has no confirmation and may invoke `sudo` for an unwritable system cache, so disclose scope and privilege first |
+| pacman | `paccache -d` for the configured cache; `pacman -Qdt` for true orphan candidates | `paccache -r` keeps its documented default of three versions; it has no confirmation and may invoke `sudo` for an unwritable system cache, so disclose scope and privilege first |
 | systemd journal | scoped `journalctl --disk-usage`, which includes active and archived files | scoped `journalctl --vacuum-time=...` or `--vacuum-size=...`, which removes archived files only; use one combined `--rotate --vacuum-*` command only if active data is explicitly included |
+| logrotate | `logrotate --debug CONFIG`, which changes neither logs nor state | `logrotate CONFIG` only for reviewed eligible entries; disclose configured pre/postrotate scripts and state changes, never add `--force`, and never directly delete or truncate active logs |
 | Flatpak | advisory inventory of the selected installation; no uninstall dry run | exactly one of `flatpak --user uninstall --unused`, `flatpak --system uninstall --unused`, or `flatpak --installation=NAME uninstall --unused`; review the prompt for unused runtimes/extensions and never add `--delete-data` |
 | Docker | effective local daemon plus `docker system df -v`; use category-specific inventories | one matching component command, such as `docker image prune`, `docker builder prune`, `docker network prune`, or `docker container prune`; state that container prune removes all stopped containers and their writable layers |
 | Podman | effective local connection/store plus `podman system df -v` | one matching component command, such as `podman image prune`, `podman network prune`, or `podman container prune`; state the exact category and defaults |
 
-Package-cache cleanup deletes local package artifacts and may remove offline reinstall or downgrade material. `apt-get clean` and DNF package-cache cleanup delete all cached packages; `paccache -r` retains only its documented default. Protect rollback artifacts or state that recovery may require a repository and network download.
+Package-cache cleanup deletes local package artifacts and may remove offline reinstall or downgrade material. `apt-get autoclean` removes artifacts no longer downloadable; `apt-get clean` and DNF package-cache cleanup delete all cached packages; `paccache -r` retains only its documented default. Protect rollback artifacts or state that recovery may require a repository and network download.
 
-Before a package mutation, check for effective auto-answer settings such as APT assume-yes/quiet configuration, DNF `assumeyes`, or DNF 5 `DNF5_FORCE_INTERACTIVE`. Stop if the interaction differs from the proposal.
+Before APT autoremove, record the effective `APT::AutoRemove::RecommendsImportant` and `APT::AutoRemove::SuggestsImportant` policy and whether the simulation lacked root-readable configuration; review the exact removal list. Before any package mutation, check for effective auto-answer settings such as APT assume-yes/quiet configuration, DNF `assumeyes`, or DNF 5 `DNF5_FORCE_INTERACTIVE`. Stop if the interaction differs from the proposal.
+
+`pacman -Qdt` is inventory only. Never pipe its output directly to `pacman -Rns`; package removal requires a separate proposal with explicit reviewed targets. If the detected native package manager has no verified row above, such as Portage or zypper, do not infer cache, orphan, or removal commands; limit work to separately verified non-mutating inventories and explanation.
 
 For application caches, resolve the effective cache root per XDG: accept `$XDG_CACHE_HOME` only when non-empty and absolute; otherwise use `$HOME/.cache`. Identify the owner and use its documented cleaner. Never empty the cache root wholesale.
 
