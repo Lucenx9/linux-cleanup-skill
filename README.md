@@ -6,15 +6,15 @@ The skill is intentionally instruction-only: there is no universal cleanup scrip
 
 > audit → propose → approve → execute one → verify
 
-Broad requests stay read-only until the user selects an exact operation. Personal files, configuration, backups, snapshots, application data, and container volumes are preserved by default.
+Broad requests stay non-mutating until the user selects an exact operation. Personal files, configuration, backups, snapshots, application data, stopped-container writable layers, and container volumes are preserved by default.
 
 ## What it covers
 
 - filesystem space and inode diagnosis
 - APT, DNF 4, DNF 5, and pacman package cleanup
 - systemd journal retention
-- Flatpak unused runtimes
-- Docker and Podman unused objects
+- Flatpak unused runtimes and extensions, in an explicit installation
+- Docker and Podman objects, one category and local daemon/store at a time
 - application caches, only through an identified owner's documented cleaner
 
 Unsupported or ambiguous tools fall back to audit and explanation; the agent must not guess a cleanup command.
@@ -73,7 +73,9 @@ The workflow adapts the strongest ideas from pstack—authoritative audit, bound
 - [pstack worktree cleanup playbook](https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md)
 - [pstack skills](https://github.com/cursor/plugins/tree/main/pstack/skills)
 
-Cleanup semantics are grounded in upstream manuals for [GNU `df`](https://www.gnu.org/software/coreutils/manual/html_node/df-invocation.html), [GNU `du`](https://www.gnu.org/software/coreutils/manual/html_node/du-invocation.html), [APT](https://manpages.debian.org/unstable/apt/apt-get.8.en.html), [DNF 4](https://dnf.readthedocs.io/en/stable/command_ref.html), [DNF 5](https://dnf5.readthedocs.io/en/stable/), [paccache](https://man.archlinux.org/man/paccache.8), [`journalctl`](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [Flatpak](https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-uninstall), [Docker](https://docs.docker.com/reference/cli/docker/system/prune/), and [Podman](https://docs.podman.io/en/stable/markdown/podman-system-prune.1.html).
+Cleanup semantics are grounded in upstream manuals for [GNU `df`](https://www.gnu.org/software/coreutils/manual/html_node/df-invocation.html), [GNU `du`](https://www.gnu.org/software/coreutils/manual/html_node/du-invocation.html), [APT](https://manpages.debian.org/unstable/apt/apt-get.8.en.html), [DNF 4](https://dnf.readthedocs.io/en/stable/command_ref.html), [DNF 5](https://dnf5.readthedocs.io/en/stable/), [paccache](https://man.archlinux.org/man/paccache.8), [`journalctl`](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [Flatpak](https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-uninstall), [Docker](https://docs.docker.com/engine/manage-resources/pruning/), and [Podman](https://docs.podman.io/en/stable/markdown/podman-system-prune.1.html).
+
+Arch-specific guidance was also checked against a local, versioned copy of [ArchWiki](https://wiki.archlinux.org/). When a wiki passage conflicts with a current upstream command reference, the upstream project documentation and the installed command's help take precedence. See the [2026-08-21 upstream audit](research/linux-upstream-audit-2026-08-21.md) for the findings, decisions, and source conflict found during review.
 
 ## License
 
