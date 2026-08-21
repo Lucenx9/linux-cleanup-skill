@@ -1,113 +1,152 @@
 ---
 name: linux-cleanup
-description: Audit and safely reclaim disk space on Linux with native filesystem, package-manager, log, Flatpak, Snap, Docker, and Podman tools. Use when a Linux filesystem is full or the user asks to inspect disk usage, clean caches or logs, remove unused packages or runtimes, or prune container data. Keep broad requests non-mutating until the user selects an exact cleanup operation.
+description: Audit Linux disk usage and safely reclaim space from package caches, logs, unused runtimes, and container data. Use for a full filesystem or a cleanup request. Audit first; run only an approved operation.
 license: MIT
 ---
 
 # Linux cleanup
 
-Reclaim space without treating “unused” as permission to delete. Follow: **audit → propose → approve → execute one → verify**.
+Reclaim space without treating "unused" as permission to delete. Work in five stages: **audit → propose → approve → execute one → verify**.
 
-## Authority boundary
+## Safety boundary
 
-- Treat a broad request such as “clean this Linux machine” as authority to audit and propose, not to mutate.
-- If the user names an exact operation and its scope and effects are clear, revalidate it and proceed without asking the same question again.
-- Never broaden scope: user to system, rootless to rootful, one filesystem to another, local to remote, or one installation/daemon to another.
-- Preserve personal files, configuration, databases, backups, snapshots, package rollback material, stopped containers and their writable layers, volumes, and application data by default.
-- Use the subsystem's native cleanup command. Never delete directly from package-manager, journal, Flatpak, Docker, or Podman stores.
-- During audit, do not use `sudo`, refresh package metadata, access the network, or run a command known to write state. Report permission and coverage gaps instead.
-- Use explicit existing targets. Never pass `/`, a home directory, a workspace root, unresolved variables, globs, or `..` to a cleanup command.
-- Approval is the safeguard; a tool prompt is not approval. Retain prompts and check whether configuration or environment disables them. Never add automatic-confirmation, force, purge, all-resources, or volume-removal options.
+- A broad request such as "clean this Linux machine" allows an audit and proposal, not changes.
+- If the user names an operation and its scope and effects are clear, revalidate it and proceed. Do not ask the same question again.
+- Keep the approved scope. Do not cross from user to system, rootless to rootful, one filesystem to another, local to remote, or one installation or daemon to another.
+- Preserve personal files, configuration, databases, backups, snapshots, package rollback material, stopped containers, writable layers, volumes, and application data by default.
+- Use the subsystem's cleanup command. Do not delete files directly from package-manager, journal, Flatpak, Docker, or Podman stores.
+- Keep the audit read-only. Do not use `sudo`, access the network, refresh package metadata, or run commands known to write state. Report what the audit could not inspect.
+- Use existing resolved targets. Do not pass `/`, a home directory, a workspace root, unresolved variables, globs, or `..` to a cleanup command.
+- Treat approval as the safeguard. A tool prompt is not approval. Keep prompts enabled and do not add force, purge, all-resources, automatic-confirmation, or volume-removal options.
 
-The skill never grants permission beyond the user's request or the host agent's approval policy.
+This skill does not grant permission beyond the user's request or the host agent's approval policy.
 
 ## 1. Establish scope
 
-1. Parse `/etc/os-release` as data when present; otherwise use `/usr/lib/os-release`. Never source or combine them.
-2. Resolve the requested target to an existing canonical path. Record its current mount namespace, mount point, filesystem type, free blocks, and free inodes.
-3. Inspect the target's mount tree. Identify nested mounts, including same-filesystem bind mounts, before traversing it.
-4. Detect installed tools and versions. Distinguish DNF 4 from DNF 5 and Flatpak user, system, and named installations.
-5. Resolve the effective local Docker or Podman endpoint, including context/connection and environment or CLI overrides. Distinguish local rootless from local rootful stores; stop on a remote target unless the user explicitly requested it.
-6. Stop and ask when the target filesystem or execution context is ambiguous.
+1. Parse `/etc/os-release` as data when present. Otherwise parse `/usr/lib/os-release`. Do not source or combine them.
+2. Resolve the target to an existing canonical path. Record its mount namespace, mount point, filesystem type, free blocks, and free inodes.
+3. Inspect the target's mount tree. Record nested mounts, including same-filesystem bind mounts, before traversing it.
+4. Detect installed tools and versions. Distinguish DNF 4 from DNF 5. Record in-scope Flatpak user, system, and named installations.
+5. Resolve the active Docker or Podman endpoint, including context, connection, environment, and CLI overrides. Distinguish local rootless and rootful stores. Stop on a remote target unless the user requested it.
+6. Ask when the filesystem or execution context remains ambiguous.
 
-Complete this step only when the target filesystem and every inspected context are explicit.
+Do not continue until the target filesystem and every inspected context are clear.
 
-## 2. Build a non-mutating baseline
+## 2. Audit without changes
 
-The examples assume GNU/Linux; confirm options against the installed implementation and use consistent explicit units when comparing measurements.
+These examples assume GNU/Linux. Check options against the installed implementation and use consistent units.
 
-- Measure the target with `df -hT` and `df -i` using a path on that filesystem.
-- On Btrfs, add `btrfs filesystem usage MOUNT` and, when useful, `btrfs filesystem du PATH`; report privilege-limited detail and distinguish estimated free space, `statfs`/`df`, and shared/exclusive usage. Inventory subvolumes/snapshots with the installed manager. Never treat generic `du` or a snapshot's logical size as physical reclaimable space.
-- Rank large directories with `du` on the canonical target. Exclude every nested or unrelated mount found above. Treat `-x`/`--one-file-system` only as a same-device guard: it does not block same-filesystem bind mounts.
-- If inodes are scarce, rank inode-heavy directories with `du --inodes --one-file-system` or an installed equivalent, applying the same recorded mount exclusions; `--one-file-system` still does not exclude same-filesystem bind mounts.
-- Inspect only relevant installed subsystems:
-  - journal: inventory every in-scope `--system`, explicitly selected `--user`, or directory context separately with `journalctl --disk-usage`; never treat one or an access-limited view as the total
-  - traditional logs: when `logrotate` is relevant, map log files to their effective configuration and preview it with `logrotate --debug CONFIG`; keep this separate from journald and report unreadable configuration/state
-  - Docker: after resolving the effective local daemon, use `docker system df -v`; add `docker buildx du` for the selected builder when BuildKit/buildx is relevant
-  - Podman: after resolving the effective local connection/store, use `podman system df -v` and state that its documented view does not inventory every build-cache or external-storage candidate
-  - Flatpak: inventory each selected installation separately; there is no transaction-equivalent dry run for `uninstall --unused`
-  - Snap: when installed or in scope, inventory retained revisions with `snap list --all` and data snapshots with `snap saved` separately; report access gaps
-  - package managers: measure caches and preview orphan candidates with the matching native tool where that preview is non-mutating
-- If visible `du` usage is materially below `df`, or space remains allocated after cleanup, inspect deleted-but-open files with an installed read-only diagnostic such as `lsof` or readable `/proc/*/fd`. Report permission/namespace gaps; never manipulate `/proc` entries or restart a service without separate approval.
-- Treat every reclaimable size as an estimate. Shared layers, hard links, reflinks, snapshots, copy-on-write, compression, active journal files, and deleted-but-open files make totals non-additive. Never present a combined total unless the scopes and methods are demonstrably disjoint and additive.
+- Measure the target with `df -hT` and `df -i`, using a path on that filesystem.
+- On Btrfs, add `btrfs filesystem usage MOUNT`. Use `btrfs filesystem du PATH` when shared and exclusive usage matters.
+- Report missing Btrfs detail when permissions limit it. Keep estimated free space, `statfs` or `df`, and shared or exclusive usage distinct.
+- Inventory Btrfs subvolumes and snapshots with the installed manager. Generic `du` and a snapshot's logical size do not show physical reclaimable space.
+- Rank large directories with `du` on the canonical target. Exclude each nested or unrelated mount recorded above.
+- Treat `-x` or `--one-file-system` as a same-device guard. It does not block same-filesystem bind mounts.
+- If inodes are scarce, rank inode-heavy directories with `du --inodes --one-file-system` or an installed equivalent. Apply the same mount exclusions.
+- Inspect only installed subsystems that matter to the target:
+  - Journal: run `journalctl --disk-usage` for each selected `--system`, `--user`, or `--directory` scope. Report access limits. One view may not be the total.
+  - Traditional logs: map relevant files to their effective logrotate configuration. Preview it with `logrotate --debug CONFIG`. Keep this result separate from journald.
+  - Docker: after resolving the local daemon, use `docker system df -v`. Add `docker buildx du` when the selected builder matters.
+  - Podman: after resolving the local connection and store, use `podman system df -v`. Its documented output omits some build-cache and external-storage candidates.
+  - Flatpak: inventory each selected installation separately. `uninstall --unused` has no transaction-equivalent dry run.
+  - Snap: list retained revisions with `snap list --all` and data snapshots with `snap saved`. Keep the two inventories separate.
+  - Package managers: measure caches and use a native read-only orphan preview when one exists.
+- If `du` is materially below `df`, inspect deleted-but-open files with `lsof` or readable `/proc/*/fd`.
+  Report anything hidden by permissions or namespaces. Do not manipulate `/proc` or restart a service without separate approval.
+- Treat reclaimable sizes as estimates. Shared layers, hard links, reflinks, snapshots, copy-on-write, compression, active journals, and deleted-but-open files can make estimates overlap.
+- Add estimates only when their scopes and methods do not overlap.
 
-Complete this step with a before snapshot, coverage gaps, and candidates from authoritative subsystem inventories.
+Finish the audit with before measurements, unreadable scopes, and candidates reported by the relevant subsystem tools.
 
-## 3. Propose exact operations
+## 3. Propose operations
 
-Present a numbered table containing, for each operation:
+Present a numbered table. For each operation, show:
 
 - scope and target
-- current size and estimated reclaimable space, including confidence
-- exact command
-- what will be removed and preserved
-- privilege required and recovery cost
+- current size and estimated reclaimable space, with confidence
+- command
+- data removed and preserved
+- required privilege and recovery cost
 
-Keep package caches separate from package removal, user scope separate from system scope, and every container-object category separate from volumes. Ask the user to select operation numbers. Classification is advice, not approval.
+Keep package caches separate from package removal. Keep user and system scopes separate. Split container cleanup by object type and keep volumes separate.
 
-Do not invent retention limits, ages, version counts, filters, or thresholds. Obtain them from a documented default or explicit user choice and show the consequences. If upstream exposes no exact dry run, label the candidate set and recovery estimate as unknown until the normal transaction prompt.
+Ask the user to select operation numbers unless the original request already approved one listed operation with the same scope and effects. A category such as "packages" or "Docker" is not an operation.
 
-## 4. Use conservative native operations
+Do not invent retention limits, ages, version counts, filters, or thresholds.
+Use a documented default or ask the user to choose.
+If no exact dry run exists, mark the candidate list and recovery estimate as unknown. Review the normal transaction prompt when the tool provides one.
 
-Confirm every command and option against the installed version's `--help` or man page.
+## 4. Use native cleanup commands
 
-| Subsystem | Non-mutating preflight | One operation after approval |
-| --- | --- | --- |
-| APT | measure the archive cache; `apt-get -s autoremove` for package candidates, treating simulation as an estimate | `apt-get autoclean` for no-longer-downloadable cache artifacts; `apt-get clean` is a separate all-cache operation and `apt-get autoremove` a separate package operation |
-| DNF 4 | `dnf -C list --autoremove` with cached metadata | `dnf clean packages`; `dnf autoremove` is a separate operation |
-| DNF 5 | `dnf5 -C info --autoremove` prevents downloads but a non-root run may create `~/.cache/libdnf5`; omit it unless that cache write was explicitly accepted | `dnf5 clean packages`; `dnf5 autoremove` is a separate operation |
-| pacman | `paccache -d` for the configured cache; `pacman -Qdt` for true orphan candidates | `paccache -r` keeps its documented default of three versions; it has no confirmation and may invoke `sudo` for an unwritable system cache, so disclose scope and privilege first |
-| systemd journal | scoped `journalctl --disk-usage`, which includes active and archived files | scoped `journalctl --vacuum-time=...` or `--vacuum-size=...`, which removes archived files only; use one combined `--rotate --vacuum-*` command only if active data is explicitly included |
-| logrotate | `logrotate --debug CONFIG`, which changes neither logs nor state | `logrotate CONFIG` only for reviewed eligible entries; disclose configured pre/postrotate scripts and state changes, never add `--force`, and never directly delete or truncate active logs |
-| Flatpak | advisory inventory of the selected installation; no uninstall dry run | exactly one of `flatpak --user uninstall --unused`, `flatpak --system uninstall --unused`, or `flatpak --installation=NAME uninstall --unused`; review the prompt for unused runtimes/extensions and never add `--delete-data` |
-| Docker | effective local daemon plus `docker system df -v`; use category-specific inventories | one matching component command, such as `docker image prune`, `docker builder prune`, `docker network prune`, or `docker container prune`; state that container prune removes all stopped containers and their writable layers |
-| Podman | effective local connection/store plus `podman system df -v` | one matching component command, such as `podman image prune`, `podman network prune`, or `podman container prune`; state the exact category and defaults |
+Check each command and option against the installed version's `--help` or man page. Each item below is a separate operation.
 
-Package-cache cleanup deletes local package artifacts and may remove offline reinstall or downgrade material. `apt-get autoclean` removes artifacts no longer downloadable; `apt-get clean` and DNF package-cache cleanup delete all cached packages; `paccache -r` retains only its documented default. Protect rollback artifacts or state that recovery may require a repository and network download.
+- **APT.** Resolve `Dir::Cache::archives` from the effective APT configuration. Do not assume `/var/cache/apt/archives`.
+  Measure the resolved cache for cache operations. Use `apt-get -s autoremove` only to inspect package-removal candidates.
+  After approval, choose one command.
+  `apt-get autoclean` removes cached archive files that can no longer be downloaded.
+  `apt-get clean` removes all cached archive files.
+  `apt-get autoremove` removes installed packages that APT marks as no longer needed.
+- **DNF 4.** Use `dnf -C list --autoremove` with cached metadata to inspect candidates.
+  After approval, use either `dnf clean packages` or `dnf autoremove`.
+- **DNF 5.** `dnf5 -C info --autoremove` prevents downloads, but a non-root run may create `~/.cache/libdnf5`. Skip it unless the user accepts that write.
+  After approval, use either `dnf5 clean packages` or `dnf5 autoremove`.
+- **pacman.** Use `paccache -d` to inspect its configured cache and `pacman -Qdt` to list true orphans.
+  After approval, `paccache -r` keeps its documented default of three versions. It has no confirmation and may invoke `sudo` when the system cache is not writable, so disclose both facts first.
+- **systemd journal.** Use scoped `journalctl --disk-usage` to measure active and archived files.
+  After approval, use one scoped `journalctl --vacuum-time=...` or `--vacuum-size=...` command. Vacuuming removes archived files only.
+  Add `--rotate` in the same command only when the user also approved moving active data into scope.
+- **logrotate.** Use `logrotate --debug CONFIG` to preview eligible logs without changing logs or state.
+  After approval, use `logrotate CONFIG`. Disclose configured pre- and post-rotate scripts and state changes. Do not add `--force`, delete logs directly, or truncate active logs.
+- **Flatpak.** Inventory the selected installation. There is no uninstall dry run.
+  After approval, use one of `flatpak --user uninstall --unused`, `flatpak --system uninstall --unused`, or `flatpak --installation=NAME uninstall --unused`. Review the transaction prompt and do not add `--delete-data`.
+- **Docker.** Resolve the local daemon and use `docker system df -v` plus category-specific inventories.
+  After approval, use one matching component command such as `docker image prune`, `docker builder prune`, or `docker network prune`.
+- **Podman.** Resolve the local connection and store, then use `podman system df -v`.
+  After approval, use one matching component command such as `podman image prune` or `podman network prune`.
 
-Before APT autoremove, record the effective `APT::AutoRemove::RecommendsImportant` and `APT::AutoRemove::SuggestsImportant` policy and whether the simulation lacked root-readable configuration; review the exact removal list. Before any package mutation, check for effective auto-answer settings such as APT assume-yes/quiet configuration, DNF `assumeyes`, or DNF 5 `DNF5_FORCE_INTERACTIVE`. Stop if the interaction differs from the proposal.
+Package-cache cleanup may remove offline reinstall or downgrade material. Protect required rollback packages or state that recovery may require a repository and network access.
 
-`pacman -Qdt` is inventory only. Never pipe its output directly to `pacman -Rns`; package removal requires a separate proposal with explicit reviewed targets. If the detected native package manager has no verified row above, such as Portage or zypper, do not infer cache, orphan, or removal commands; limit work to separately verified non-mutating inventories and explanation.
+Before APT autoremove, record `APT::AutoRemove::RecommendsImportant` and `APT::AutoRemove::SuggestsImportant`. Note when the simulation could not read root-only configuration, then review the removal list.
 
-For application caches, resolve the effective cache root per XDG: accept `$XDG_CACHE_HOME` only when non-empty and absolute; otherwise use `$HOME/.cache`. Identify the owner and use its documented cleaner. Never empty the cache root wholesale.
+Before changing packages, check whether configuration disables normal prompts.
+Check APT assume-yes and quiet settings, DNF `assumeyes`, and DNF 5 `DNF5_FORCE_INTERACTIVE`. Stop if prompt behavior differs from the proposal.
 
-Keep outside the normal path: Snap revisions/snapshots, Flatpak application data, package purges, stopped-container removal, Docker/Podman aggregate `system prune`, container volumes, and Podman `--build` or `--external`. Audit one only when the user explicitly requests that exact high-risk target and understands the recovery cost. Arbitrary files found by `du` are report-only; this skill never deletes them.
+`pacman -Qdt` is inventory only. Do not pipe it to `pacman -Rns`. Package removal needs a separate proposal with reviewed package names.
+
+For an unlisted package manager such as Portage or zypper, do not guess cleanup commands. Use only native read-only inventories that you verified on the installed version.
+
+For application caches, accept `$XDG_CACHE_HOME` only when it is non-empty and absolute. Otherwise use `$HOME/.cache`. Identify the owner and use its documented cleaner. Do not empty the cache root.
+
+### Require a separate request
+
+Do not propose these after a broad cleanup request:
+
+- Snap revisions or snapshots
+- Flatpak application data
+- package purges
+- stopped containers and their writable layers, including `docker container prune` and `podman container prune`
+- Docker or Podman `system prune`
+- container volumes
+- Podman `--build` or `--external`
+
+Audit one only when the user names that target and understands the recovery cost. Files found by `du` are report-only. This skill does not delete them.
 
 ## 5. Execute one operation
 
-Immediately before execution, recheck the target filesystem and mount identity, command version, user, effective daemon/installation, candidate scope, privilege, and prompt behavior. Re-resolve any path target; if any precondition differs from the proposal, invalidate approval and return to audit.
+Immediately before execution, recheck the filesystem and mount identity, command version, user, daemon or installation, candidate list, privilege, and prompt behavior.
+Resolve path targets again. If any result differs from the proposal, discard the approval and return to the audit.
 
-Run exactly one approved command. Do not chain cleanup commands. Stop on an error, unexpected candidate set, expanded scope, or a privilege request or warning not disclosed in the proposal.
+Run one approved command. Do not chain cleanup commands. Stop on an error, a changed candidate list, wider scope, or an undisclosed privilege request or warning.
 
-After interruption, rebuild the audit; never resume from an old candidate list.
+After an interruption, rebuild the audit. Do not reuse an old candidate list.
 
 ## 6. Verify and report
 
 After each operation:
 
-1. Re-run the same subsystem inventory and `df` measurements.
-2. Report the observed delta separately from the estimate.
+1. Run the same subsystem inventory and `df` measurements.
+2. Report the observed change separately from the estimate.
 3. List what ran, what was preserved, what failed, and what remains eligible.
-4. Continue only if the next operation is still explicitly approved and its preconditions are unchanged; otherwise ask.
+4. Continue only when the next operation is still approved and its preconditions have not changed. Otherwise ask.
 
-Complete only when every executed operation has before/after evidence and no unapproved operation ran.
+Finish only when every executed operation has before and after evidence and no unapproved operation ran.
