@@ -15,7 +15,7 @@ Reclaim space without treating "unused" as permission to delete. Use this contro
 - Keep the approved scope. Do not cross from user to system, rootless to rootful, one filesystem to another, local to remote, or one installation or daemon to another.
 - Preserve personal files, configuration, databases, backups, snapshots, package rollback material, stopped containers, writable layers, volumes, and application data by default.
 - Use the subsystem's cleanup command. Do not delete files directly from package-manager, journal, Flatpak, Docker, or Podman stores.
-- Keep the audit read-only. Do not use `sudo`, access the network, refresh package metadata, or run commands known to write state. Report what the audit could not inspect.
+- Keep the audit read-only. Do not use `sudo`, refresh package metadata, or run commands known to write state. Network access is allowed only for read-only inventory of an explicitly requested remote container target after its transport and identity pass the checks below. Report what the audit could not inspect.
 - Use existing resolved targets. Do not pass `/`, a home directory, a workspace root, unresolved variables, globs, or `..` to a cleanup command.
 - Treat approval as the safeguard. A tool prompt is not approval. Keep prompts enabled and do not add force, purge, all-resources, automatic-confirmation, or volume-removal options.
 - Run a prompt-bearing cleanup only in an interactive terminal where the prompt and any transaction or candidate list remain visible. If that is unavailable, stop at the proposal instead of adding an automatic-confirmation or force option.
@@ -40,7 +40,7 @@ If any package-persistence field is unknown or transient, report autoremove as u
 3. Inspect the target's mount tree. Record nested mounts, including same-filesystem bind mounts, before traversing it.
 4. Detect installed tools and versions. Record whether `/usr` is read-only or image-managed and whether bootc or another image-based package model owns the host. Parse `bootc status --format=json` as data when bootc is available. Distinguish DNF 4 from DNF 5. Record in-scope Flatpak user, system, and named installations.
 5. For each in-scope package manager whose storage may affect the target, resolve its effective cache roots and map them to mount identities.
-6. Resolve the active Docker or Podman endpoint, including context, connection, environment, and CLI overrides. Distinguish local rootless and rootful stores. Stop on a remote target unless the user requested it.
+6. Resolve the active Docker or Podman endpoint, including context, connection, environment, and CLI overrides. Before inventory, explicitly label both Docker and Podman endpoints as local or remote and their stores as rootless or rootful. Stop before network access to a remote target unless the user requested that exact target.
 7. Resolve each container store to its mount identity. Record Docker Root Dir and Podman graph root, volume path, image store, and applicable storage overrides. Treat a root on another filesystem as a separate scope.
 8. Ask when the filesystem or execution context remains ambiguous.
 
@@ -60,7 +60,7 @@ These examples assume GNU/Linux. Check options against the installed implementat
 - Inspect only installed subsystems that matter to the target:
   - Journal: run `journalctl --disk-usage` for each selected `--system`, `--user`, or `--directory` scope. Report access limits. One view may not be the total.
   - Traditional logs: map relevant files to their effective logrotate configuration. Preview it with `logrotate --debug CONFIG`. Keep this result separate from journald.
-  - Docker: after resolving the local daemon and storage root, use `docker system df -v`. Before a Buildx inventory, identify an existing builder by name without changing the current builder, and record every node endpoint. Stop on a remote node unless the user requested it, then use `docker buildx du --builder NAME`.
+  - Docker: after resolving the daemon and storage root, use `docker system df -v`. Before a Buildx inventory, identify an existing builder by name without changing the current builder, and record every node endpoint. A requested remote node is the only Buildx audit exception to the network ban. Before network access, require authenticated encryption and verified remote identity: SSH with host identity verification, or TCP with a trusted CA and verified server name plus client credentials when required. Reject plaintext or unverified TCP, missing verification material, and identity mismatches. Only then use `docker buildx du --builder NAME`.
   - Podman: after resolving the local connection and store, use `podman system df -v`. Its documented output omits some build-cache and external-storage candidates.
   - Flatpak: inventory each selected installation separately. `uninstall --unused` has no transaction-equivalent dry run.
   - Snap: list retained revisions with `snap list --all` and data snapshots with `snap saved`. Keep the two inventories separate.
@@ -84,7 +84,7 @@ Present a numbered table. For each operation, show:
 
 Keep package caches separate from package removal. Keep user and system scopes separate. Split container cleanup by object type and keep volumes separate.
 
-Ask the user to select operation numbers unless the original request already approved one listed operation with the same scope and effects. When approval is still required, end the proposal by stating that no cleanup will run and asking the user to approve one exact numbered operation. A category such as "packages" or "Docker" is not an operation.
+Ask the user to select operation numbers unless the original request already approved one listed operation with the same scope and effects. When approval is still required, end the proposal by stating that no cleanup will run and asking the user to approve exactly one numbered operation. Execution is limited to that operation; each later operation needs its own approval. A category such as "packages" or "Docker" is not an operation.
 
 Do not invent retention limits, ages, version counts, filters, or thresholds.
 Use a documented default or ask the user to choose.
@@ -150,10 +150,14 @@ Audit one only when the user names that target and understands the recovery cost
 
 ## 5. Execute one operation
 
-Immediately before execution, recheck the filesystem and mount identity, container storage roots, builder and node endpoints, command version, user, daemon or installation, candidate list, privilege, and prompt behavior.
-Resolve path targets again. If any result differs from the proposal, discard the approval and return to the audit.
+Immediately before execution, compare every scope gate with the audited snapshot:
 
-Run one approved command. Do not chain cleanup commands. Stop on an error, a changed candidate list, wider scope, or an undisclosed privilege request or warning.
+- Common: filesystem and mount identity, command version, user, installation or daemon, candidate list, privilege, prompt behavior, and resolved paths.
+- Containers: storage roots, local or remote and rootless or rootful identity, builder and node endpoints, and remote transport and identity verification.
+- Image-managed packages: host model and deployment status, DNF persistence, and every cache root and mount identity.
+- logrotate: effective configuration, complete include closure, eligible entries, scripts, and state path.
+
+If any value differs from the proposal, discard the approval and return to the audit. Run only the one exact numbered operation approved. Do not chain cleanup commands. Stop on an error, a changed candidate list, wider scope, or an undisclosed privilege request or warning.
 
 After an interruption, rebuild the audit. Do not reuse an old candidate list.
 

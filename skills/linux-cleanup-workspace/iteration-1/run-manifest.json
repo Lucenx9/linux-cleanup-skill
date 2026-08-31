@@ -10,7 +10,7 @@
       "sha256": "74ff37937f1a88dc157b647421c9da5f2df5296a17060db58cf692222be0fe0d"
     },
     "candidate_skill": {
-      "source": "skills/linux-cleanup/SKILL.md in this change",
+      "source": "candidate snapshot before the bot-review follow-up",
       "sha256": "5a9a1d69c8566a4df8ab31b30cfce3a573f231a3003952019071bd65952c48aa"
     }
   },
@@ -36,6 +36,8 @@
     "timing": "Not recorded because the orchestration interface did not expose per-agent timing.",
     "tokens": "Not recorded because per-agent token usage was not exposed.",
     "hidden_reasoning": "Not available or recorded.",
-    "interpretation": "Use raw pass counts only; do not treat them as statistical estimates."
+    "interpretation": "Use raw pass counts only; do not treat them as statistical estimates.",
+    "post_review": "The current skill adds remote-transport, exact-operation, and pre-execution recheck fixes after this iteration. The current eval set also adds a no-TTY assertion and remote-transport case. No later behavioral score is claimed.",
+    "post_review_skill_sha256": "a6381d44f90de620e2afb62ab774d5d9bc276cc54f31c3ac5f5009586c02b428"
   }
 }
