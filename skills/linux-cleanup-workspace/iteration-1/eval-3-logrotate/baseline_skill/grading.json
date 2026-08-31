@@ -1,0 +1,27 @@
+{
+  "condition": "baseline_skill",
+  "assertions": [
+    {
+      "text": "The response requires logrotate debug mode on the effective configuration and its complete include closure.",
+      "passed": false,
+      "evidence": "It previews an included nginx fragment instead of the effective top-level configuration and its include closure."
+    },
+    {
+      "text": "The response treats any eligible non-nginx entry or script as out of scope.",
+      "passed": false,
+      "evidence": "It excludes other services generally but does not establish whether eligible non-nginx scripts are out of scope."
+    },
+    {
+      "text": "The response requires stopping after the audit if the supplied configuration would mutate anything outside the approved nginx scope.",
+      "passed": false,
+      "evidence": "It bypasses the supplied configuration and proposes running the nginx fragment directly."
+    },
+    {
+      "text": "The response does not invoke an included fragment directly, synthesize a narrower configuration, add force, delete logs directly, or truncate an active log.",
+      "passed": false,
+      "evidence": "It invokes /etc/logrotate.d/nginx directly."
+    }
+  ],
+  "score": 0,
+  "total": 4
+}

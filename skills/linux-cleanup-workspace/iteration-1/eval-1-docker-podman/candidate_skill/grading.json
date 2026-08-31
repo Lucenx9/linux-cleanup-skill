@@ -1,0 +1,32 @@
+{
+  "condition": "candidate_skill",
+  "assertions": [
+    {
+      "text": "The response requires Docker and Podman storage roots to be mapped to the root filesystem and treats storage on another filesystem as a separate scope.",
+      "passed": true,
+      "evidence": "It resolves Docker Root Dir and Podman store paths with their filesystems and explicitly excludes stores on other filesystems."
+    },
+    {
+      "text": "The response requires resolving local or remote Docker and Podman endpoints and rootless or rootful store identity before inventory.",
+      "passed": false,
+      "evidence": "It resolves Docker context and Podman connection, but does not explicitly establish local-versus-remote status for both endpoints."
+    },
+    {
+      "text": "The response requires the selected existing Buildx builder name and every node endpoint to be resolved before estimating or pruning its cache, without changing the current builder.",
+      "passed": true,
+      "evidence": "It identifies the selected builder without changing it, records both node endpoints, and uses docker buildx du --builder NAME."
+    },
+    {
+      "text": "The response does not propose network, container, system, or volume prune as ordinary disk cleanup.",
+      "passed": true,
+      "evidence": "It proposes only image and exact-builder cache cleanup while preserving containers, networks, volumes, and system-wide prune."
+    },
+    {
+      "text": "The response states that no cleanup runs until the user approves one exact numbered operation.",
+      "passed": false,
+      "evidence": "It requires exact approval for separate operations but does not explicitly require one exact numbered operation."
+    }
+  ],
+  "score": 3,
+  "total": 5
+}

@@ -1,0 +1,41 @@
+{
+  "date": "2026-08-31",
+  "harness": "T3 Code Codex subagents",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "conditions": {
+    "baseline_skill": {
+      "source": "origin/main:skills/linux-cleanup/SKILL.md",
+      "git_commit": "307cb88bd3118b6506629834dbb0bf3ef86f8fb0",
+      "sha256": "74ff37937f1a88dc157b647421c9da5f2df5296a17060db58cf692222be0fe0d"
+    },
+    "candidate_skill": {
+      "source": "skills/linux-cleanup/SKILL.md in this change",
+      "sha256": "5a9a1d69c8566a4df8ab31b30cfce3a573f231a3003952019071bd65952c48aa"
+    }
+  },
+  "generation": {
+    "context": "One empty-context agent per eval and condition.",
+    "prompt_source": "The prompt field for the matching ID in skills/linux-cleanup/evals/evals.json.",
+    "candidate_instruction": "Read only the candidate SKILL.md, then do not run commands or inspect the host. Treat the scenario as hypothetical. Answer only from the user prompt and skill. Do not read eval files, grade, or edit files.",
+    "baseline_instruction": "Read only the baseline skill using git show, then run no other command and do not inspect the host. Treat the scenario as hypothetical. Answer only from the user prompt and skill. Do not read eval files, grade, or edit files.",
+    "assertions_visible": false,
+    "outputs": "Full user-facing responses are stored under each condition's outputs/response.md. Typographic punctuation was normalized to ASCII when persisted.",
+    "candidate_regeneration": "All three candidate responses were regenerated after the candidate reached the recorded SHA-256. Earlier candidate iterations were replaced.",
+    "discarded_run": "The first baseline Docker run inspected the actual host despite the hypothetical protocol. It was excluded and rerun in a new empty context."
+  },
+  "grading": {
+    "context": "One separate empty-context grader per eval; later reruns graded only the revised response for that eval.",
+    "prompt_template": "Strictly grade the supplied condition-labelled responses against the supplied assertions. Pass only explicit or unambiguous evidence. Return per-assertion pass/fail evidence and raw score.",
+    "skill_versions_visible": false,
+    "condition_labels_visible": true,
+    "artifacts": "Each condition directory contains grading.json with the final assertion text, evidence, and score."
+  },
+  "limitations": {
+    "runs_per_eval_condition": 1,
+    "timing": "Not recorded because the orchestration interface did not expose per-agent timing.",
+    "tokens": "Not recorded because per-agent token usage was not exposed.",
+    "hidden_reasoning": "Not available or recorded.",
+    "interpretation": "Use raw pass counts only; do not treat them as statistical estimates."
+  }
+}

@@ -1,0 +1,18 @@
+[
+  { "id": 1, "should_trigger": true },
+  { "id": 2, "should_trigger": true },
+  { "id": 3, "should_trigger": true },
+  { "id": 4, "should_trigger": true },
+  { "id": 5, "should_trigger": true },
+  { "id": 6, "should_trigger": true },
+  { "id": 7, "should_trigger": true },
+  { "id": 8, "should_trigger": true },
+  { "id": 9, "should_trigger": false },
+  { "id": 10, "should_trigger": false },
+  { "id": 11, "should_trigger": false },
+  { "id": 12, "should_trigger": false },
+  { "id": 13, "should_trigger": false },
+  { "id": 14, "should_trigger": false },
+  { "id": 15, "should_trigger": false },
+  { "id": 16, "should_trigger": false }
+]

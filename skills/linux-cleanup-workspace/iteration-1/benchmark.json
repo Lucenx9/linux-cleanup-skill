@@ -1,0 +1,36 @@
+{
+  "iteration": 1,
+  "method": {
+    "baseline": "origin/main at 307cb88bd3118b6506629834dbb0bf3ef86f8fb0",
+    "candidate": "skills/linux-cleanup/SKILL.md in this change",
+    "generation": "Separate fresh-context generators saw only one prompt and their assigned skill version. They did not see assertions.",
+    "grading": "Separate fresh-context graders saw condition-labelled responses and assertions. They did not see either skill version.",
+    "runs_per_eval_condition": 1,
+    "interpretation": "These are raw pass counts from one run per condition, not statistical estimates."
+  },
+  "results": [
+    {
+      "eval_id": 1,
+      "name": "docker-podman-buildx-scope",
+      "baseline": { "passed": 0, "total": 5 },
+      "candidate": { "passed": 3, "total": 5 }
+    },
+    {
+      "eval_id": 2,
+      "name": "bootc-dnf-persistence",
+      "baseline": { "passed": 0, "total": 4 },
+      "candidate": { "passed": 4, "total": 4 }
+    },
+    {
+      "eval_id": 3,
+      "name": "logrotate-include-scope",
+      "baseline": { "passed": 0, "total": 4 },
+      "candidate": { "passed": 4, "total": 4 }
+    }
+  ],
+  "aggregate": {
+    "baseline": { "passed": 0, "total": 13, "pass_rate": 0.0 },
+    "candidate": { "passed": 11, "total": 13, "pass_rate": 0.8461538462 },
+    "delta": { "passed": 11, "pass_rate": 0.8461538462 }
+  }
+}
