@@ -1,0 +1,66 @@
+[
+  {
+    "query": "ugh, no space left on device again... can u see what's eating /var? don't delete yet",
+    "should_trigger": true
+  },
+  {
+    "query": "updates keep whining there isn't enough room, maybe old packages?",
+    "should_trigger": true
+  },
+  {
+    "query": "/var keeps filling up. Check journald and logrotate and tell me what can safely be reduced.",
+    "should_trigger": true
+  },
+  {
+    "query": "Docker is using 80 GB on this server. Audit the local daemon and propose one safe cleanup at a time.",
+    "should_trigger": true
+  },
+  {
+    "query": "Can I reclaim space from old Flatpak runtimes? Keep my apps and their data.",
+    "should_trigger": true
+  },
+  {
+    "query": "df is basically full but du looks normal?? figure out where the space went first",
+    "should_trigger": true
+  },
+  {
+    "query": "This Arch machine has run out of inodes. Find the cause and check the pacman cache.",
+    "should_trigger": true
+  },
+  {
+    "query": "Inspect Podman's rootless storage and estimate what image cleanup would recover.",
+    "should_trigger": true
+  },
+  {
+    "query": "Clean up the old feature branches in this Git repository.",
+    "should_trigger": false
+  },
+  {
+    "query": "Refactor this Python data-cleaning script and make its CSV output deterministic.",
+    "should_trigger": false
+  },
+  {
+    "query": "Optimize this Dockerfile so the resulting image is smaller.",
+    "should_trigger": false
+  },
+  {
+    "query": "My Linux service is using too much RAM. Find the memory leak.",
+    "should_trigger": false
+  },
+  {
+    "query": "Resize the root partition to use the unallocated space on the disk.",
+    "should_trigger": false
+  },
+  {
+    "query": "Recover the photos I accidentally deleted from an ext4 drive.",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a log retention policy for our application repository.",
+    "should_trigger": false
+  },
+  {
+    "query": "Uninstall Firefox and replace it with Chromium on my workstation.",
+    "should_trigger": false
+  }
+]

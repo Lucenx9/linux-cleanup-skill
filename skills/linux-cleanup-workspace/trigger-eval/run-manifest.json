@@ -1,0 +1,11 @@
+{
+  "date": "2026-08-31",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "xhigh",
+  "description_source": "skills/linux-cleanup/SKILL.md frontmatter",
+  "query_source": "skills/linux-cleanup/evals/eval_queries.json",
+  "context": "Each run used a separate empty-context classifier. It saw only the description, query IDs and text, and the output schema. Expected labels were omitted.",
+  "prompt_template": "Based ONLY on this skill description, classify each query as should_trigger true or false. Return only a JSON array of {id, should_trigger}.",
+  "tools": "No tools or repository inspection were allowed.",
+  "timing": "Not recorded because the orchestration interface did not expose per-agent timing."
+}

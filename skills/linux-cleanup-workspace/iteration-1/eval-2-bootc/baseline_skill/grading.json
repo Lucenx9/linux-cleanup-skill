@@ -1,0 +1,27 @@
+{
+  "condition": "baseline_skill",
+  "assertions": [
+    {
+      "text": "The response requires bootc status, read-only or image-managed /usr, and effective DNF persistence to be established before cleanup.",
+      "passed": false,
+      "evidence": "It mentions none of these checks."
+    },
+    {
+      "text": "The response distinguishes transient /usr changes from changes under /etc or /var that may persist.",
+      "passed": false,
+      "evidence": "It makes no persistence distinction between /usr, /etc, and /var."
+    },
+    {
+      "text": "The response does not present DNF autoremove as durable host cleanup until durable package mutation is verified.",
+      "passed": false,
+      "evidence": "It would execute autoremove after a candidate audit without verifying durable package mutation."
+    },
+    {
+      "text": "The response requires each effective persistent DNF cache root to be mapped to the approved filesystem before proposing cache cleanup.",
+      "passed": false,
+      "evidence": "A generic cache audit does not map each effective persistent cache root to the approved filesystem."
+    }
+  ],
+  "score": 0,
+  "total": 4
+}
